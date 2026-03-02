@@ -1,12 +1,11 @@
-# =========================================================
-# FINAL PROJECT:
-# Classical vs Quantum Search using Grover’s Algorithm
-# Password Cracking Application (1–3 Qubits)
-# Multiple Graphs + Noise Analysis
-# =========================================================
+"""Grover's algorithm: quantum vs classical search simulation and plots."""
 
+# Removed banner:
+# Classical vs Quantum Search using Grover’s Algorithm
 import math
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from qiskit import QuantumCircuit, transpile
@@ -15,9 +14,6 @@ from qiskit_aer.noise import NoiseModel, depolarizing_error
 from qiskit.quantum_info import Statevector
 
 
-# ---------------------------------------------------------
-# CLASSICAL BRUTE-FORCE SEARCH
-# ---------------------------------------------------------
 def classical_search(search_space, target):
     steps = 0
     for candidate in search_space:
@@ -32,16 +28,6 @@ def generate_passwords(n):
 
 
 def get_target_state(n_qubits, allow_custom=True):
-    """
-    Interactive function to get target state from user.
-    
-    Args:
-        n_qubits: Number of qubits
-        allow_custom: Whether to allow custom target selection
-    
-    Returns:
-        Target state as binary string
-    """
     all_states = generate_passwords(n_qubits)
     
     print(f"\n{'='*60}")
@@ -67,11 +53,8 @@ def get_target_state(n_qubits, allow_custom=True):
             else:
                 choice = input(f"\nEnter target state (binary string, {n_qubits} bits) or index (0-{len(all_states)-1}): ").strip()
             
-            # FIRST: Check for option numbers (1, 2, 3) when allow_custom is True
-            # This must come before checking if it's a digit/index to avoid confusion
             if allow_custom and choice in ['1', '2', '3']:
                 if choice == '1':
-                    # Option 1: Direct binary string input
                     target = input(f"Enter {n_qubits}-bit binary string: ").strip()
                     if all(c in '01' for c in target) and len(target) == n_qubits:
                         if target in all_states:
@@ -82,7 +65,6 @@ def get_target_state(n_qubits, allow_custom=True):
                     else:
                         print(f"✗ Invalid format. Must be {n_qubits} bits (0s and 1s only)")
                 elif choice == '2':
-                    # Option 2: Index input
                     idx_str = input(f"Enter index (0-{len(all_states)-1}): ").strip()
                     if idx_str.isdigit():
                         idx = int(idx_str)
@@ -95,12 +77,10 @@ def get_target_state(n_qubits, allow_custom=True):
                     else:
                         print(f"✗ Invalid input. Please enter a number between 0-{len(all_states)-1}")
                 elif choice == '3':
-                    # Option 3: Worst-case (all 1s)
                     target = "1" * n_qubits
                     print(f"\n✓ Selected worst-case target: {target}")
                     return target
             
-            # SECOND: Check if it's a valid binary string (direct input, not through option 1)
             elif all(c in '01' for c in choice) and len(choice) == n_qubits:
                 if choice in all_states:
                     print(f"\n✓ Selected target state: {choice}")
@@ -108,7 +88,6 @@ def get_target_state(n_qubits, allow_custom=True):
                 else:
                     print(f"✗ Invalid: '{choice}' is not a valid {n_qubits}-bit state")
             
-            # THIRD: Check if it's a number (index) - only if not already handled as option
             elif choice.isdigit() and not (allow_custom and choice in ['1', '2', '3']):
                 idx = int(choice)
                 if 0 <= idx < len(all_states):
@@ -131,23 +110,16 @@ def get_target_state(n_qubits, allow_custom=True):
             print(f"✗ Error: {e}. Please try again.")
 
 
-def compare_target_states(n_qubits, target_list):
-    """
-    Compare performance of Grover's algorithm for different target states.
-    
-    Args:
-        n_qubits: Number of qubits
-        target_list: List of target states to compare
-    """
-    print(f"\n{'='*70}")
-    print(f"COMPARING MULTIPLE TARGET STATES")
-    print(f"{'='*70}\n")
-    
+def compare_target_states(n_qubits, target_list, show=True):
     results = []
     passwords = generate_passwords(n_qubits)
-    
+
+    if show:
+        print(f"\n{'='*70}\nCOMPARING MULTIPLE TARGET STATES\n{'='*70}\n")
+
     for target in target_list:
-        print(f"Analyzing target: {target}...")
+        if show:
+            print(f"Analyzing target: {target}...")
         classical_steps = classical_search(passwords, target)
         grover_iters, ideal_p, noisy_p, _, _ = run_quantum(n_qubits, target)
         
@@ -269,34 +241,22 @@ def compare_target_states(n_qubits, target_list):
     plt.suptitle(f'Target State Comparison (n={n_qubits} qubits)', 
                  fontsize=12, fontweight='bold', y=0.98)
     plt.tight_layout(rect=[0, 0.02, 1, 0.96])
-    plt.show()
-    
-    # Print detailed comparison
-    print(f"\n{'='*70}")
-    print(f"DETAILED COMPARISON RESULTS")
-    print(f"{'='*70}\n")
-    print(f"{'Target':<10} {'Classical':<12} {'Grover':<10} {'Ideal %':<10} {'Noisy %':<10} {'Speedup':<10}")
-    print("-" * 70)
-    for r in results:
-        print(f"{r['target']:<10} {r['classical_steps']:<12} {r['grover_iters']:<10} "
-              f"{r['ideal_prob']*100:>6.1f}%    {r['noisy_prob']*100:>6.1f}%    {r['speedup']:>6.2f}x")
-    print(f"{'='*70}\n")
-    
-    # Key insights
-    best_speedup = max(results, key=lambda x: x['speedup'])
-    worst_speedup = min(results, key=lambda x: x['speedup'])
-    
-    print("KEY INSIGHTS:")
-    print(f"  • Best speedup: {best_speedup['target']} ({best_speedup['speedup']:.2f}x)")
-    print(f"  • Worst speedup: {worst_speedup['target']} ({worst_speedup['speedup']:.2f}x)")
-    print(f"  • All targets show same Grover iterations: {results[0]['grover_iters']}")
-    print(f"  • Classical steps vary by target position in search space")
-    print(f"{'='*70}\n")
+    if show:
+        plt.show()
+        best_speedup = max(results, key=lambda x: x['speedup'])
+        worst_speedup = min(results, key=lambda x: x['speedup'])
+        print(f"\n{'='*70}\nDETAILED COMPARISON RESULTS\n{'='*70}\n")
+        print(f"{'Target':<10} {'Classical':<12} {'Grover':<10} {'Ideal %':<10} {'Noisy %':<10} {'Speedup':<10}")
+        print("-" * 70)
+        for r in results:
+            print(f"{r['target']:<10} {r['classical_steps']:<12} {r['grover_iters']:<10} "
+                  f"{r['ideal_prob']*100:>6.1f}%    {r['noisy_prob']*100:>6.1f}%    {r['speedup']:>6.2f}x")
+        print(f"\nBest speedup: {best_speedup['target']} ({best_speedup['speedup']:.2f}x), "
+              f"worst: {worst_speedup['target']} ({worst_speedup['speedup']:.2f}x)\n{'='*70}\n")
+    else:
+        return plt.gcf()
 
 
-# ---------------------------------------------------------
-# GROVER ORACLE (EDGE-CASE SAFE)
-# ---------------------------------------------------------
 def grover_oracle(n_qubits, marked_state):
     oracle = QuantumCircuit(n_qubits)
 
@@ -327,9 +287,6 @@ def grover_oracle(n_qubits, marked_state):
     return gate
 
 
-# ---------------------------------------------------------
-# DIFFUSION OPERATOR (EDGE-CASE SAFE)
-# ---------------------------------------------------------
 def diffusion_operator(n):
     diff = QuantumCircuit(n)
 
@@ -357,9 +314,6 @@ def diffusion_operator(n):
     return gate
 
 
-# ---------------------------------------------------------
-# GROVER CIRCUIT
-# ---------------------------------------------------------
 def grover_circuit(n_qubits, marked_state):
     qc = QuantumCircuit(n_qubits, n_qubits)
     qc.h(range(n_qubits))
@@ -377,14 +331,33 @@ def grover_circuit(n_qubits, marked_state):
     return qc, iterations
 
 
-# ---------------------------------------------------------
-# NOISE MODEL
-# ---------------------------------------------------------
-def create_noise_model():
+def get_circuit_stats(n_qubits, marked_state):
+    """Return basic structural statistics for the Grover circuit."""
+    qc, iterations = grover_circuit(n_qubits, marked_state)
+    return {
+        "iterations": iterations,
+        "depth": qc.depth(),
+        "size": qc.size(),
+        "num_qubits": qc.num_qubits,
+        "num_clbits": qc.num_clbits,
+    }
+
+
+def plot_grover_circuit_diagram(n_qubits, marked_state, show=True):
+    """Return a matplotlib figure with the Grover circuit diagram."""
+    qc, _ = grover_circuit(n_qubits, marked_state)
+    fig = qc.draw(output="mpl")
+    if show:
+        plt.show()
+    else:
+        return fig
+
+
+def create_noise_model(error_1q=0.01, error_2q=0.02):
     noise = NoiseModel()
 
-    error_1q = depolarizing_error(0.01, 1)
-    error_2q = depolarizing_error(0.02, 2)
+    error_1q = depolarizing_error(error_1q, 1)
+    error_2q = depolarizing_error(error_2q, 2)
 
     noise.add_all_qubit_quantum_error(error_1q, ['h', 'x'])
     noise.add_all_qubit_quantum_error(error_2q, ['cx'])
@@ -392,35 +365,45 @@ def create_noise_model():
     return noise
 
 
-# ---------------------------------------------------------
-# RUN QUANTUM EXPERIMENT
-# ---------------------------------------------------------
-def run_quantum(n_qubits, target):
+def run_quantum(
+    n_qubits,
+    target,
+    shots=1024,
+    noise_enabled=True,
+    error_1q=0.01,
+    error_2q=0.02,
+):
+    """Run Grover's algorithm on ideal and (optionally) noisy simulators.
+
+    Returns:
+        iterations: number of Grover iterations applied
+        ideal_prob: success probability on the ideal simulator
+        noisy_prob: success probability on the noisy simulator (0 if disabled)
+        ideal_counts: raw counts from the ideal simulator
+        noisy_counts: raw counts from the noisy simulator (empty if disabled)
+    """
     qc, iterations = grover_circuit(n_qubits, target)
 
+    # Ideal simulator
     ideal_sim = AerSimulator()
-    noisy_sim = AerSimulator(noise_model=create_noise_model())
-
     qc_ideal = transpile(qc, ideal_sim)
-    qc_noisy = transpile(qc, noisy_sim)
+    ideal_counts = ideal_sim.run(qc_ideal, shots=shots).result().get_counts()
+    ideal_prob = ideal_counts.get(target, 0) / shots
 
-    ideal_counts = ideal_sim.run(qc_ideal, shots=1024).result().get_counts()
-    noisy_counts = noisy_sim.run(qc_noisy, shots=1024).result().get_counts()
-
-    ideal_prob = ideal_counts.get(target, 0) / 1024
-    noisy_prob = noisy_counts.get(target, 0) / 1024
+    # Optional noisy simulator
+    if noise_enabled:
+        noisy_sim = AerSimulator(noise_model=create_noise_model(error_1q, error_2q))
+        qc_noisy = transpile(qc, noisy_sim)
+        noisy_counts = noisy_sim.run(qc_noisy, shots=shots).result().get_counts()
+        noisy_prob = noisy_counts.get(target, 0) / shots
+    else:
+        noisy_counts = {}
+        noisy_prob = 0.0
 
     return iterations, ideal_prob, noisy_prob, ideal_counts, noisy_counts
 
 
-# ---------------------------------------------------------
-# SIMULATE GROVER STATE EVOLUTION
-# ---------------------------------------------------------
 def simulate_grover_evolution(n_qubits, marked_state, max_iterations=None):
-    """
-    Simulate Grover's algorithm step-by-step and return state probabilities
-    at each iteration.
-    """
     if max_iterations is None:
         max_iterations = int(math.floor(math.pi / 4 * math.sqrt(2**n_qubits)))
     
@@ -472,16 +455,7 @@ def simulate_grover_evolution(n_qubits, marked_state, max_iterations=None):
     return probabilities, states, iteration_numbers
 
 
-# ---------------------------------------------------------
-# PLOTTING FUNCTIONS
-# ---------------------------------------------------------
-def plot_superposition_state(n_qubits):
-    """
-    Visualize the initial superposition state (Step 1) showing amplitudes.
-    Shows equal superposition of all states after Hadamard gates.
-    Matches the "Step 1: Superposition" visualization.
-    """
-    # Create initial superposition state
+def plot_superposition_state(n_qubits, show=True):
     qc = QuantumCircuit(n_qubits)
     qc.h(range(n_qubits))
     state = Statevector.from_instruction(qc)
@@ -531,20 +505,14 @@ def plot_superposition_state(n_qubits):
              fontsize=8, fontweight='bold')
     
     plt.tight_layout(rect=[0, 0.04, 1, 0.96])
-    plt.show()
-    
-    # Print information
-    print(f"  Superposition State ({n_qubits} qubit{'s' if n_qubits > 1 else ''}):")
-    print(f"    Number of states: {2**n_qubits}")
-    print(f"    Amplitude per state: {max_amplitude:.4f} (1/√{2**n_qubits})")
-    print(f"    All states are equally likely\n")
+    if show:
+        plt.show()
+        print(f"  Superposition ({n_qubits} qubit{'s' if n_qubits > 1 else ''}): {2**n_qubits} states, amplitude {max_amplitude:.4f}\n")
+    else:
+        return plt.gcf()
 
 
-def plot_advanced_grover_steps(n_qubits, marked_state):
-    """
-    Advanced visualization showing Step 1 (Superposition), Step 2 (Oracle), 
-    and Step 3 (Diffusion) side by side with both amplitudes and probabilities.
-    """
+def plot_advanced_grover_steps(n_qubits, marked_state, show=True):
     oracle = grover_oracle(n_qubits, marked_state)
     diffuser = diffusion_operator(n_qubits)
     
@@ -669,34 +637,13 @@ def plot_advanced_grover_steps(n_qubits, marked_state):
     
     # Adjust spacing between subplots
     plt.tight_layout(rect=[0, 0.04, 1, 0.95])
-    plt.show()
-    
-    # Print detailed information
-    print(f"\n{'='*70}")
-    print(f"DETAILED STEP-BY-STEP ANALYSIS")
-    print(f"{'='*70}")
-    print(f"\nStep 1: Superposition")
-    print(f"  - All {2**n_qubits} states have equal amplitude: {amplitudes_init[0]:.6f} (1/√{2**n_qubits})")
-    print(f"  - All states have equal probability: {probs_init[0]:.6f} (1/{2**n_qubits})")
-    
-    print(f"\nStep 2: Oracle (Phase Flip)")
-    print(f"  - Target state '{marked_state}' phase flipped (sign changed)")
-    print(f"  - Target amplitude: {amplitudes_oracle[target_idx]:.6f} (phase: {phases_oracle[target_idx]:.3f} rad)")
-    print(f"  - Other states unchanged in amplitude")
-    print(f"  - Probabilities appear similar, but phase information changed")
-    
-    print(f"\nStep 3: Diffusion (Amplification)")
-    print(f"  - Target state '{marked_state}' probability: {probs_diff[target_idx]:.6f} ({probs_diff[target_idx]*100:.2f}%)")
-    print(f"  - Other states probability: ~{np.mean([p for i, p in enumerate(probs_diff) if i != target_idx]):.6f}")
-    print(f"  - Amplification factor: {probs_diff[target_idx] / probs_init[target_idx]:.2f}x")
-    print(f"{'='*70}\n")
+    if show:
+        plt.show()
+    else:
+        return plt.gcf()
 
 
-def plot_grover_simulation(n_qubits, marked_state):
-    """
-    Visualize the step-by-step evolution of Grover's algorithm.
-    Shows probability distribution at each iteration.
-    """
+def plot_grover_simulation(n_qubits, marked_state, show=True):
     probabilities, state_labels, _ = simulate_grover_evolution(n_qubits, marked_state)
     
     # Generate all possible states
@@ -749,13 +696,13 @@ def plot_grover_simulation(n_qubits, marked_state):
     plt.suptitle(f"Grover's Algorithm Simulation (n={n_qubits}, target={marked_state})", 
                  fontsize=14, fontweight='bold')
     plt.tight_layout()
-    plt.show()
+    if show:
+        plt.show()
+    else:
+        return plt.gcf()
 
 
-def plot_grover_evolution_animated(n_qubits, marked_state):
-    """
-    Plot the evolution of target state probability over iterations.
-    """
+def plot_grover_evolution_animated(n_qubits, marked_state, show=True):
     probabilities, state_labels, iteration_numbers = simulate_grover_evolution(n_qubits, marked_state)
     target_idx = int(marked_state, 2)
     
@@ -779,14 +726,13 @@ def plot_grover_evolution_animated(n_qubits, marked_state):
     plt.legend(fontsize=9)
     plt.tick_params(labelsize=9)
     plt.tight_layout()
-    plt.show()
+    if show:
+        plt.show()
+    else:
+        return plt.gcf()
 
 
-def plot_comparative_study(n_qubits, classical_steps, grover_iters, ideal_prob, noisy_prob):
-    """
-    Comprehensive comparative study visualization showing classical vs quantum search.
-    """
-    # Create a figure with multiple subplots - smaller size for better text visibility
+def plot_comparative_study(n_qubits, classical_steps, grover_iters, ideal_prob, noisy_prob, show=True):
     fig = plt.figure(figsize=(12, 7))
     
     # Calculate speedup
@@ -929,51 +875,16 @@ def plot_comparative_study(n_qubits, classical_steps, grover_iters, ideal_prob, 
     # Overall title - smaller
     plt.suptitle(f'Comparative Study: Classical vs Quantum (n={n_qubits} qubits)', 
                  fontsize=13, fontweight='bold', y=0.98)
-    
+
     plt.tight_layout(rect=[0, 0.02, 1, 0.96])
-    plt.show()
-    
-    # Print detailed comparison
-    print(f"\n{'='*70}")
-    print(f"COMPARATIVE STUDY: CLASSICAL vs QUANTUM SEARCH")
-    print(f"{'='*70}")
-    print(f"\nSearch Space: {2**n_qubits} possible states")
-    print(f"\n1. STEPS/ITERATIONS COMPARISON:")
-    print(f"   Classical Search (worst case): {classical_steps} steps")
-    print(f"   Grover's Algorithm: {grover_iters} iterations")
-    print(f"   Quantum Advantage: {speedup:.2f}x speedup")
-    
-    print(f"\n2. TIME COMPLEXITY:")
-    print(f"   Classical: O(N) = O({2**n_qubits}) - Linear")
-    print(f"   Quantum: O(√N) = O({int(math.sqrt(2**n_qubits))}) - Square root")
-    print(f"   Complexity Reduction: Exponential improvement")
-    
-    print(f"\n3. SUCCESS RATES:")
-    print(f"   Classical: 100% (deterministic - always finds target)")
-    print(f"   Ideal Quantum: {ideal_prob*100:.2f}% (near-optimal)")
-    print(f"   Noisy Quantum: {noisy_prob*100:.2f}% (realistic hardware)")
-    
-    print(f"\n4. SCALING BEHAVIOR:")
-    print(f"   As qubits increase, quantum advantage grows exponentially:")
-    for n in [n_qubits, n_qubits+1, n_qubits+2]:
-        if n <= 10:
-            classical_n = 2**n
-            quantum_n = int(math.floor(math.pi / 4 * math.sqrt(2**n)))
-            speedup_n = classical_n / quantum_n if quantum_n > 0 else 0
-            print(f"   {n} qubits: Classical={classical_n}, Quantum={quantum_n}, Speedup={speedup_n:.1f}x")
-    
-    print(f"\n5. KEY INSIGHTS:")
-    print(f"   • Quantum search provides quadratic speedup (O(√N) vs O(N))")
-    print(f"   • Advantage increases exponentially with problem size")
-    print(f"   • Current result: {speedup:.2f}x faster than classical")
-    print(f"   • For large databases, quantum advantage becomes dramatic")
-    print(f"{'='*70}\n")
+    if show:
+        plt.show()
+        print(f"\nComparative study (n={n_qubits}): classical {classical_steps} steps, Grover {grover_iters} iters, speedup {speedup:.2f}x")
+    else:
+        return plt.gcf()
 
 
-def plot_classical_vs_quantum(classical, quantum, n):
-    """
-    Simple bar chart comparison for single qubit configuration.
-    """
+def plot_classical_vs_quantum(classical, quantum, n, show=True):
     plt.figure(figsize=(6, 4))
     methods = ["Classical Search", "Grover Search"]
     steps = [classical, quantum]
@@ -999,10 +910,13 @@ def plot_classical_vs_quantum(classical, quantum, n):
              bbox=dict(boxstyle='round', facecolor='yellow', alpha=0.7, pad=3))
     
     plt.tight_layout()
-    plt.show()
+    if show:
+        plt.show()
+    else:
+        return plt.gcf()
 
 
-def plot_scaling(classical_list, quantum_list, qubits):
+def plot_scaling(classical_list, quantum_list, qubits, show=True):
     plt.figure(figsize=(7, 4.5))
     plt.plot(qubits, classical_list, marker='o', linewidth=2, markersize=6, 
              label="Classical O(N)", color='#FF6B6B')
@@ -1015,10 +929,13 @@ def plot_scaling(classical_list, quantum_list, qubits):
     plt.grid(True, alpha=0.3)
     plt.tick_params(labelsize=9)
     plt.tight_layout()
-    plt.show()
+    if show:
+        plt.show()
+    else:
+        return plt.gcf()
 
 
-def plot_success_probability(ideal_probs, noisy_probs, qubits):
+def plot_success_probability(ideal_probs, noisy_probs, qubits, show=True):
     plt.figure(figsize=(7, 4.5))
     plt.plot(qubits, ideal_probs, marker='o', linewidth=2, markersize=6, 
              label="Ideal Quantum", color='#95E1D3')
@@ -1032,47 +949,13 @@ def plot_success_probability(ideal_probs, noisy_probs, qubits):
     plt.ylim([0, 1.1])
     plt.tick_params(labelsize=9)
     plt.tight_layout()
-    plt.show()
+    if show:
+        plt.show()
+    else:
+        return plt.gcf()
 
 
-# ---------------------------------------------------------
-# STANDALONE SIMULATION FUNCTION
-# ---------------------------------------------------------
-def run_grover_simulation(n_qubits=None, target=None):
-    """
-    Run a standalone Grover's algorithm simulation.
-    
-    Args:
-        n_qubits: Number of qubits (default: 2)
-        target: Target state as binary string (default: "11" for 2 qubits)
-    """
-    if n_qubits is None:
-        n_qubits = 2
-    if target is None:
-        target = "1" * n_qubits
-    
-    print(f"\n===== GROVER'S ALGORITHM SIMULATION =====\n")
-    print(f"Number of qubits: {n_qubits}")
-    print(f"Target state: {target}")
-    print(f"Search space size: {2**n_qubits}\n")
-    
-    # Show step-by-step probability distribution
-    plot_grover_simulation(n_qubits, target)
-    
-    # Show probability evolution over iterations
-    plot_grover_evolution_animated(n_qubits, target)
-    
-    print("Simulation complete!\n")
-
-
-# ---------------------------------------------------------
-# MAIN DEMO
-# ---------------------------------------------------------
 if __name__ == "__main__":
-
-    print("\n===== QUANTUM PASSWORD CRACKING DEMO =====\n")
-    
-    # Ask user for number of qubits
     while True:
         try:
             n_qubits = int(input("How many qubits would you like to simulate? (1-5 recommended): "))
@@ -1090,11 +973,6 @@ if __name__ == "__main__":
             print("\n\nExiting...")
             exit(0)
     
-    print(f"\n{'='*60}")
-    print(f"Running simulation for {n_qubits} qubit{'s' if n_qubits > 1 else ''}")
-    print(f"{'='*60}\n")
-    
-    # Ask user if they want to compare multiple targets or use single target
     while True:
         try:
             compare_choice = input("Do you want to compare multiple target states? (y/n): ").strip().lower()
@@ -1111,11 +989,6 @@ if __name__ == "__main__":
             exit(0)
     
     if compare_mode:
-        # Multiple target comparison mode
-        print(f"\n{'='*60}")
-        print("MULTIPLE TARGET COMPARISON MODE")
-        print(f"{'='*60}\n")
-        
         target_list = []
         print("Enter target states to compare (enter 'done' when finished):")
         while True:
@@ -1174,54 +1047,13 @@ if __name__ == "__main__":
     # Run quantum search
     grover_iters, ideal_p, noisy_p, ideal_counts, noisy_counts = run_quantum(n_qubits, target)
     
-    # Print results
-    print(f"\n{'='*60}")
-    print(f"RESULTS FOR {n_qubits} QUBIT{'S' if n_qubits > 1 else ''}")
-    print(f"{'='*60}")
-    print(f"Target password: {target}")
-    print(f"Search space size: {2**n_qubits}")
-    print(f"Classical attempts (worst case): {classical_steps}")
-    print(f"Grover iterations: {grover_iters}")
-    print(f"Ideal success probability: {ideal_p:.4f} ({ideal_p*100:.2f}%)")
-    print(f"Noisy success probability: {noisy_p:.4f} ({noisy_p*100:.2f}%)")
-    print(f"{'='*60}\n")
-    
-    # Show Step 1: Superposition visualization
-    print("Showing Step 1: Superposition state...")
+    print(f"\nResults: target={target}, classical steps={classical_steps}, Grover iters={grover_iters}, "
+          f"ideal p={ideal_p:.2%}, noisy p={noisy_p:.2%}\n")
+
     plot_superposition_state(n_qubits)
-    
-    # Show Advanced 3-Step Visualization (Step 1, Step 2 Oracle, Step 3 Diffusion)
-    print("\nShowing Advanced 3-Step Visualization (Superposition → Oracle → Diffusion)...")
     plot_advanced_grover_steps(n_qubits, target)
-    
-    # Show Grover's algorithm simulation (full iteration)
-    print("Showing Grover's algorithm complete step-by-step evolution...")
     plot_grover_simulation(n_qubits, target)
-    
-    # Show probability evolution curve
-    print("Showing target state probability evolution...")
     plot_grover_evolution_animated(n_qubits, target)
-    
-    # Show comprehensive comparative study
-    print("Showing Comprehensive Comparative Study...")
     plot_comparative_study(n_qubits, classical_steps, grover_iters, ideal_p, noisy_p)
-    
-    # Show simple classical vs quantum comparison
-    print("Showing Simple Classical vs Quantum comparison...")
     plot_classical_vs_quantum(classical_steps, grover_iters, n_qubits)
-    
-    # Show measurement results
-    print(f"\n{'='*60}")
-    print("MEASUREMENT RESULTS (1024 shots)")
-    print(f"{'='*60}")
-    print("\nIdeal Quantum Computer Results:")
-    print(f"  Target state '{target}': {ideal_counts.get(target, 0)} measurements ({ideal_p*100:.2f}%)")
-    print(f"  Other states: {1024 - ideal_counts.get(target, 0)} measurements")
-    
-    print("\nNoisy Quantum Computer Results:")
-    print(f"  Target state '{target}': {noisy_counts.get(target, 0)} measurements ({noisy_p*100:.2f}%)")
-    print(f"  Other states: {1024 - noisy_counts.get(target, 0)} measurements")
-    print(f"{'='*60}\n")
-    
-    print("All visualizations complete!")
-    print("Close the plot windows to exit.\n")
+    print(f"Measurements (1024 shots): ideal target={ideal_counts.get(target, 0)}, noisy target={noisy_counts.get(target, 0)}\n")
