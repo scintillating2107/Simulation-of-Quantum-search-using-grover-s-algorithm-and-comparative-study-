@@ -195,6 +195,7 @@ def compare_target_states(n_qubits, target_list, show=True):
     ax3.set_xlabel('Target State', fontsize=10, fontweight='bold')
     ax3.set_ylabel('Speedup Factor', fontsize=10, fontweight='bold')
     ax3.set_title('Quantum Speedup by Target State', fontsize=11, fontweight='bold')
+    ax3.set_xticks(range(len(targets)))
     ax3.set_xticklabels(targets, fontsize=9, rotation=45, ha='right')
     ax3.grid(True, alpha=0.3, axis='y')
     
@@ -346,7 +347,22 @@ def get_circuit_stats(n_qubits, marked_state):
 def plot_grover_circuit_diagram(n_qubits, marked_state, show=True):
     """Return a matplotlib figure with the Grover circuit diagram."""
     qc, _ = grover_circuit(n_qubits, marked_state)
-    fig = qc.draw(output="mpl")
+    try:
+        fig = qc.draw(output="mpl")
+    except Exception:
+        circuit_text = qc.draw(output="text").single_string()
+        fig, ax = plt.subplots(figsize=(12, max(4, 0.35 * qc.depth())))
+        ax.axis("off")
+        ax.text(
+            0.01,
+            0.99,
+            circuit_text,
+            transform=ax.transAxes,
+            fontfamily="monospace",
+            fontsize=8,
+            va="top",
+        )
+        fig.tight_layout()
     if show:
         plt.show()
     else:
@@ -373,15 +389,7 @@ def run_quantum(
     error_1q=0.01,
     error_2q=0.02,
 ):
-    """Run Grover's algorithm on ideal and (optionally) noisy simulators.
 
-    Returns:
-        iterations: number of Grover iterations applied
-        ideal_prob: success probability on the ideal simulator
-        noisy_prob: success probability on the noisy simulator (0 if disabled)
-        ideal_counts: raw counts from the ideal simulator
-        noisy_counts: raw counts from the noisy simulator (empty if disabled)
-    """
     qc, iterations = grover_circuit(n_qubits, target)
 
     # Ideal simulator

@@ -1,5 +1,7 @@
 import streamlit as st
 
+import matplotlib.pyplot as plt
+
 from grovers import (
     generate_passwords,
     classical_search,
@@ -44,6 +46,27 @@ def compute_scaling_data(qubit_range, shots, noise_enabled, error_1q, error_2q):
 
     return classical_list, quantum_list, ideal_probs, noisy_probs
 
+
+def show_figure(fig):
+    """Render a matplotlib figure in Streamlit with a visible white background."""
+    if fig is None:
+        return
+    fig.patch.set_facecolor("white")
+    for ax in fig.get_axes():
+        ax.set_facecolor("white")
+    st.pyplot(fig, use_container_width=True, clear_figure=False)
+    plt.close(fig)
+
+
+def safe_plot(plot_fn, *args, label, **kwargs):
+    """Run a plot function and surface errors without blocking other plots."""
+    try:
+        return plot_fn(*args, show=False, **kwargs)
+    except Exception as exc:
+        st.warning(f"Could not render {label}: {exc}")
+        return None
+
+
 st.set_page_config(
     page_title="Grover's Algorithm | Quantum vs Classical Search",
     page_icon="⚛",
@@ -60,7 +83,7 @@ st.subheader("Comparative Study of Quantum Search vs Classical Search")
 
 with st.expander("What this app demonstrates"):
     st.markdown(
-        """
+        r"""
         - **Goal**: compare classical exhaustive search \(O(N)\) with Grover's quantum search \(O(\sqrt{N})\) on a password‑style search problem.
         - **Grover's loop**: repeated application of an **oracle** (marks the target state) and **diffusion** (amplitude amplification) to boost the target's measurement probability.
         - **Noise model**: configurable depolarizing noise on 1‑ and 2‑qubit gates to mimic real hardware and study robustness.
@@ -82,11 +105,11 @@ n_qubits = st.sidebar.slider(
 )
 
 st.sidebar.caption(
-    "1–6 qubits are fast and fully visualized. Higher values grow exponentially and may be slow."
+    "1–6 qubits are fast. Higher values grow exponentially and may take longer to render all plots."
 )
-if n_qubits > 8:
+if n_qubits > 6:
     st.sidebar.warning(
-        f"{n_qubits} qubits → {2**n_qubits} basis states. Some plots may be simplified."
+        f"{n_qubits} qubits → {2**n_qubits} basis states. Plot generation may be slow."
     )
 
 st.sidebar.subheader("Search mode & targets")
@@ -189,16 +212,22 @@ elif preset == "High noise (failure regime)":
         "Stress test with strong noise and more shots to study how Grover's advantage degrades."
     )
 
-run = st.sidebar.button("Run simulation")
+run = st.sidebar.button("Run simulation", type="primary")
 
 if run:
-    show = False
+    st.session_state.show_results = True
 
+if st.session_state.get("show_results"):
     if mode == "Compare multiple targets" and target_list and len(target_list) >= 2:
         st.header("Comparing multiple target states")
-        fig = compare_target_states(n_qubits, target_list, show=show)
-        if fig is not None:
-            st.pyplot(fig)
+        with st.spinner("Building comparison plots..."):
+            fig = safe_plot(
+                compare_target_states,
+                n_qubits,
+                target_list,
+                label="target comparison",
+            )
+        show_figure(fig)
 
     else:
         if target is None:
@@ -241,33 +270,60 @@ if run:
         with c2:
             st.metric("Gate count", circuit_stats["size"])
         with c3:
-            st.metric("Qubits / classical bits", f"{circuit_stats['num_qubits']} / {circuit_stats['num_clbits']}")
+            st.metric(
+                "Qubits / classical bits",
+                f"{circuit_stats['num_qubits']} / {circuit_stats['num_clbits']}",
+            )
 
         st.subheader("Visualizations and analytics")
-        st.caption("Generating plots for this configuration. For larger qubit counts this can take a few seconds.")
+        st.caption("All graphs and Grover steps are shown below. Scroll down to view each section.")
 
         with st.spinner("Building Grover visualizations..."):
-            # Precompute all figures once so we can organize them into tabs.
-            if n_qubits <= 8:
-                fig_superposition = plot_superposition_state(n_qubits, show=show)
-                fig_steps = plot_advanced_grover_steps(n_qubits, target, show=show)
-                fig_simulation = plot_grover_simulation(n_qubits, target, show=show)
-                fig_evolution = plot_grover_evolution_animated(n_qubits, target, show=show)
-            else:
-                fig_superposition = None
-                fig_steps = None
-                fig_simulation = None
-                fig_evolution = None
-
-            fig_comparative = plot_comparative_study(
-                n_qubits, classical_steps, grover_iters, ideal_p, noisy_p, show=show
+            fig_superposition = safe_plot(
+                plot_superposition_state, n_qubits, label="superposition state"
             )
-            fig_bar = plot_classical_vs_quantum(
-                classical_steps, grover_iters, n_qubits, show=show
+            fig_steps = safe_plot(
+                plot_advanced_grover_steps,
+                n_qubits,
+                target,
+                label="Grover steps",
             )
-            fig_circuit = plot_grover_circuit_diagram(n_qubits, target, show=show)
+            fig_simulation = safe_plot(
+                plot_grover_simulation,
+                n_qubits,
+                target,
+                label="Grover simulation",
+            )
+            fig_evolution = safe_plot(
+                plot_grover_evolution_animated,
+                n_qubits,
+                target,
+                label="probability evolution",
+            )
 
-            # Compute scaling data across qubits to show richer analytics.
+            fig_comparative = safe_plot(
+                plot_comparative_study,
+                n_qubits,
+                classical_steps,
+                grover_iters,
+                ideal_p,
+                noisy_p,
+                label="comparative study",
+            )
+            fig_bar = safe_plot(
+                plot_classical_vs_quantum,
+                classical_steps,
+                grover_iters,
+                n_qubits,
+                label="classical vs quantum bar chart",
+            )
+            fig_circuit = safe_plot(
+                plot_grover_circuit_diagram,
+                n_qubits,
+                target,
+                label="circuit diagram",
+            )
+
             max_scaling_n = min(max(n_qubits, 3) + 2, 8)
             qubit_range = list(range(1, max_scaling_n + 1))
             (
@@ -283,70 +339,50 @@ if run:
                 error_2q=error_2q,
             )
 
-            fig_scaling = plot_scaling(classical_list, quantum_list, qubit_range, show=show)
-            fig_success = plot_success_probability(
-                ideal_probs, noisy_probs, qubit_range, show=show
+            fig_scaling = safe_plot(
+                plot_scaling,
+                classical_list,
+                quantum_list,
+                qubit_range,
+                label="scaling plot",
+            )
+            fig_success = safe_plot(
+                plot_success_probability,
+                ideal_probs,
+                noisy_probs,
+                qubit_range,
+                label="success probability plot",
             )
 
-        (
-            overview_tab,
-            steps_tab,
-            evolution_tab,
-            comparison_tab,
-            scaling_tab,
-            circuit_tab,
-        ) = st.tabs(
-            [
-                "Overview",
-                "Grover steps",
-                "Iteration evolution",
-                "Classical vs Quantum",
-                "Scaling across qubits",
-                "Circuit diagram",
-            ]
+        st.markdown("### 1. Overview — superposition and classical vs quantum")
+        show_figure(fig_superposition)
+        show_figure(fig_bar)
+
+        st.markdown("### 2. Grover algorithm key steps")
+        st.caption("Superposition → Oracle (phase flip) → Diffusion (amplitude amplification)")
+        show_figure(fig_steps)
+
+        st.markdown("### 3. State distribution across Grover iterations")
+        show_figure(fig_simulation)
+
+        st.markdown("### 4. Target probability evolution")
+        show_figure(fig_evolution)
+
+        st.markdown("### 5. Detailed classical vs quantum comparison")
+        show_figure(fig_comparative)
+
+        st.markdown("### 6. Scaling across qubits")
+        st.caption(
+            f"Computed for {qubit_range[0]}–{qubit_range[-1]} qubits using worst-case targets."
         )
+        show_figure(fig_scaling)
+        show_figure(fig_success)
 
-        with overview_tab:
-            st.subheader("Overview for current configuration")
-            if fig_superposition is not None:
-                st.pyplot(fig_superposition)
-            if fig_bar is not None:
-                st.pyplot(fig_bar)
-
-        with steps_tab:
-            st.subheader("Grover algorithm key steps")
-            if fig_steps is not None:
-                st.pyplot(fig_steps)
-
-        with evolution_tab:
-            st.subheader("State distribution and target probability over iterations")
-            if fig_simulation is not None:
-                st.pyplot(fig_simulation)
-            if fig_evolution is not None:
-                st.pyplot(fig_evolution)
-
-        with comparison_tab:
-            st.subheader("Detailed classical vs quantum comparison")
-            if fig_comparative is not None:
-                st.pyplot(fig_comparative)
-
-        with scaling_tab:
-            st.subheader("How scaling behaves across qubits")
-            st.caption(
-                f"Computed for {qubit_range[0]}–{qubit_range[-1]} qubits using worst-case targets."
-            )
-            if fig_scaling is not None:
-                st.pyplot(fig_scaling)
-            if fig_success is not None:
-                st.pyplot(fig_success)
-
-        with circuit_tab:
-            st.subheader("Grover circuit for this configuration")
-            st.caption(
-                "Actual quantum circuit sent to the simulators, including oracle and diffusion operators."
-            )
-            if fig_circuit is not None:
-                st.pyplot(fig_circuit)
+        st.markdown("### 7. Grover quantum circuit")
+        st.caption(
+            "Actual quantum circuit sent to the simulators, including oracle and diffusion operators."
+        )
+        show_figure(fig_circuit)
 
         with st.expander(f"Measurement results ({shots} shots)"):
             st.write("**Ideal quantum:**")
@@ -361,8 +397,10 @@ if run:
             else:
                 st.write("Noisy simulator disabled for this run.")
 
+        plt.close("all")
+
 else:
-    st.info("Set options in the sidebar and click **Run simulation**.")
+    st.info("Set options in the sidebar and click **Run simulation** to see metrics and plots.")
 
 st.sidebar.divider()
 st.sidebar.caption("Grover: O(√N) vs classical O(N).")
