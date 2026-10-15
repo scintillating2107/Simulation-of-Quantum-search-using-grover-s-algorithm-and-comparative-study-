@@ -3,9 +3,14 @@
 # Removed banner:
 # Classical vs Quantum Search using Grover’s Algorithm
 import math
+import sys
 import numpy as np
 import matplotlib
-matplotlib.use("Agg")
+
+# Use non-interactive backend for Streamlit; keep interactive backend for CLI plots.
+if "streamlit" in sys.modules:
+    matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
 
 from qiskit import QuantumCircuit, transpile
@@ -31,7 +36,7 @@ def get_target_state(n_qubits, allow_custom=True):
     all_states = generate_passwords(n_qubits)
     
     print(f"\n{'='*60}")
-    print(f"TARGET STATE SELECTION")
+    print("TARGET STATE SELECTION")
     print(f"{'='*60}")
     print(f"\nAvailable states for {n_qubits} qubit{'s' if n_qubits > 1 else ''}:")
     for i, state in enumerate(all_states):
@@ -44,11 +49,11 @@ def get_target_state(n_qubits, allow_custom=True):
     while True:
         try:
             if allow_custom:
-                print(f"\nOptions:")
-                print(f"  [1] Enter target state directly (e.g., '101' for 3 qubits)")
+                print("\nOptions:")
+                print("  [1] Enter target state directly (e.g., '101' for 3 qubits)")
                 print(f"  [2] Enter index number (0-{len(all_states)-1})")
                 print(f"  [3] Use worst-case (all 1s: {'1'*n_qubits})")
-                print(f"  Or enter target state directly as binary string")
+                print("  Or enter target state directly as binary string")
                 choice = input("\nEnter option [1/2/3] or target state: ").strip()
             else:
                 choice = input(f"\nEnter target state (binary string, {n_qubits} bits) or index (0-{len(all_states)-1}): ").strip()
@@ -533,14 +538,12 @@ def plot_advanced_grover_steps(n_qubits, marked_state, show=True):
     qc_init.h(range(n_qubits))
     state_init = Statevector.from_instruction(qc_init)
     amplitudes_init = np.abs(state_init.data)
-    probs_init = amplitudes_init ** 2
     
     # Step 2: After Oracle
     qc_oracle = QuantumCircuit(n_qubits)
     qc_oracle.append(oracle, range(n_qubits))
     state_oracle = state_init.evolve(qc_oracle)
     amplitudes_oracle = np.abs(state_oracle.data)
-    probs_oracle = amplitudes_oracle ** 2
     # Get phase information for visualization
     phases_oracle = np.angle(state_oracle.data)
     
@@ -741,8 +744,8 @@ def plot_grover_evolution_animated(n_qubits, marked_state, show=True):
 
 
 def plot_comparative_study(n_qubits, classical_steps, grover_iters, ideal_prob, noisy_prob, show=True):
-    fig = plt.figure(figsize=(12, 7))
-    
+    plt.figure(figsize=(12, 7))
+
     # Calculate speedup
     speedup = classical_steps / grover_iters if grover_iters > 0 else 0
     
@@ -806,7 +809,7 @@ def plot_comparative_study(n_qubits, classical_steps, grover_iters, ideal_prob, 
     ax3.set_ylim([0, 1.15])
     ax3.grid(True, alpha=0.3, axis='y')
     # Add value labels - simplified
-    for bar, (method, prob) in zip(bars3, success_data.items()):
+    for bar, prob in zip(bars3, success_data.values()):
         height = bar.get_height()
         ax3.text(bar.get_x() + bar.get_width()/2., height + 0.03,
                 f'{prob:.2f}\n({prob*100:.0f}%)', ha='center', va='bottom', 
@@ -1058,10 +1061,12 @@ if __name__ == "__main__":
     print(f"\nResults: target={target}, classical steps={classical_steps}, Grover iters={grover_iters}, "
           f"ideal p={ideal_p:.2%}, noisy p={noisy_p:.2%}\n")
 
+    print("Opening plot windows. Close each window to advance to the next graph.\n")
     plot_superposition_state(n_qubits)
     plot_advanced_grover_steps(n_qubits, target)
     plot_grover_simulation(n_qubits, target)
     plot_grover_evolution_animated(n_qubits, target)
     plot_comparative_study(n_qubits, classical_steps, grover_iters, ideal_p, noisy_p)
     plot_classical_vs_quantum(classical_steps, grover_iters, n_qubits)
+    plot_grover_circuit_diagram(n_qubits, target)
     print(f"Measurements (1024 shots): ideal target={ideal_counts.get(target, 0)}, noisy target={noisy_counts.get(target, 0)}\n")

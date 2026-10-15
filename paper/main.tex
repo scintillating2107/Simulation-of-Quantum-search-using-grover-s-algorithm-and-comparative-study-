@@ -1,0 +1,230 @@
+% Compile with pdflatex + bibtex (Overleaf: upload this folder plus the PNGs from ../figures/).
+% Tables and in-text numbers come from generated/*.tex, written by make_tables.py from the CSVs:
+%   python study.py analyze && python paper/make_tables.py
+% Red [TODO: ...] marks text whose data or author details are still missing.
+\documentclass[conference]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{xcolor}
+\usepackage{cite}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+\graphicspath{{../figures/}{figures/}}
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\input{generated/numbers}
+
+\begin{document}
+
+\title{Simulation of Grover's Algorithm for Constraint Satisfaction Problems:\\
+A Comparative Study with Classical Search under Realistic Noise}
+
+\author{\IEEEauthorblockN{\todo{Author name}}
+\IEEEauthorblockA{\todo{Affiliation}\\ \todo{email}}}
+
+\maketitle
+
+%==============================================================================
+\begin{abstract}
+Grover's algorithm offers a quadratic speedup for unstructured search, but on near-term hardware its oracles are deep and every gate is noisy. We implement Grover search for three families of constraint satisfaction problems (3-SAT, graph 2-colouring and $4\times4$ Sudoku) with oracles that evaluate the constraints rather than encode a known answer. For each instance we measure the advantage threshold $p_2^*$: the two-qubit depolarizing error rate above which Grover's expected cost to a verified solution exceeds that of classical brute force. Across \nInstances{} random instances of up to 13 qubits, $p_2^*$ ranges from \thrLowest{} to above \num{1e-2} and falls with oracle depth. A one-parameter model, $p_2^* = \ln(P_\text{ideal}/P_\text{req})/(\alpha\,N_\text{CX})$ with $\alpha=\alphaFit$, predicts every measured threshold to within a factor of \ratioMin--\ratioMax{} ($R^2=\modelRsq$ on $\log p_2^*$). An oracle synthesis based on relative-phase Toffolis and borrowed ancillae cuts the two-qubit gate count of 3-SAT oracles by up to \cxSavingMax\,\% and raises their threshold by a median factor of \gainSatMed. On calibrated IBM device models, routing multiplies the gate count by \routeOverhead. With several solutions, the BBHT variant that does not need to know their number costs \bbhtRatioMin--\bbhtRatioMax{} times the known-$M$ optimum, and zero-noise extrapolation recovers an estimate of the success probability but not usable samples. Extrapolating the model, a 20-variable 3-SAT instance would need two-qubit error rates near $10^{-5}$.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Grover's algorithm, constraint satisfaction, SAT, graph colouring, Sudoku, NISQ, noise threshold, oracle synthesis, error mitigation
+\end{IEEEkeywords}
+
+%==============================================================================
+\section{Introduction}
+
+Grover's algorithm finds one of $M$ marked items among $N$ with $O(\sqrt{N/M})$ oracle calls, quadratically fewer than the $O(N/M)$ checks of unstructured classical search~\cite{grover1996,bbht1998}. Most demonstrations mark a bitstring that is hard-coded into the oracle. Such an oracle already contains the answer, so it does not show a useful search. A meaningful application needs an oracle that \emph{checks} a candidate without knowing the solution. Constraint satisfaction problems (CSPs) provide exactly that: the oracle evaluates the rules of a SAT formula, a graph colouring or a Sudoku puzzle on a superposition of assignments.
+
+On noisy intermediate-scale quantum (NISQ) hardware~\cite{preskill2018}, such structural oracles are deep. Vinod and Shaji~\cite{vinod2021} built a CSP oracle in Qiskit and found that execution failed on an IBM device. They then used a custom noise model to locate the error rate needed for success. We extend that line of work as follows:
+\begin{enumerate}
+\item \textbf{A noise-threshold map across three CSP families.} We define the threshold as the error rate at which Grover's expected cost (oracle calls until a verified solution) stops beating classical brute force, and measure it over random instances with bootstrap confidence intervals.
+\item \textbf{A one-parameter model of the threshold.} The threshold is set by the circuit's two-qubit gate count and by how much success probability Grover can afford to lose before brute force catches up. One fitted constant explains all measured thresholds, and a held-out problem family tests it.
+\item \textbf{Oracle synthesis as a lever on the threshold.} The oracle can borrow idle qubits for its multi-controlled gates~\cite{khattar2025}. Its compute blocks can also use relative-phase Toffolis~\cite{maslov2016}, whose extra phases cancel exactly on uncomputation.
+\item \textbf{Calibrated device models, multiple solutions and error mitigation.} We route circuits onto IBM heavy-hex layouts with per-qubit calibration data, evaluate the BBHT algorithm~\cite{bbht1998} when $M$ is unknown, and test zero-noise extrapolation~\cite{temme2017,giurgica2020}.
+\end{enumerate}
+All code, data and an interactive web app are released with the paper.
+
+%==============================================================================
+\section{Related work}
+
+\textbf{Grover on CSPs.} Vinod and Shaji~\cite{vinod2021} solve integer CSPs with comparator-based oracles and determine a noise threshold with a custom simulator noise model. Saha et al.~\cite{saha2020} design $k$-colouring circuits for near-term devices, and Mukherjee~\cite{mukherjee2021} gives a Grover-based list-colouring algorithm. Levin~\cite{levin2023} studies Grover graph colouring with a uniform state preparation over valid colours, simulated with the FakeVigo noise model. Jipipob~\cite{jipipob2025} benchmarks Grover on 3-, 4- and 5-SAT on simulators and IBM hardware. Rituparna et al.~\cite{rituparna2026} treat magic-square constraints and compare with brute force and backtracking. Alemany Manzanaro and Mora~\cite{alemany2025} compare Grover-based SAT solving on simulators and IBM hardware with classical solvers and identify qubit count and circuit depth as the main bottlenecks. Our study differs in scope: three problem families under one framework, statistical thresholds with a predictive model, oracle-synthesis ablations, and calibrated multi-device models.
+
+\textbf{Noise in Grover search.} Salas~\cite{salas2008} derives how the tolerable error in Grover's algorithm scales with database size. Wang and Krstic~\cite{wang2020} simulate textbook Grover circuits of 4 to 10 qubits under Qiskit noise models, including variants with ancilla-assisted multi-controlled Toffolis, and relate the tolerable gate error to circuit depth. Leng et al.~\cite{leng2023} define the noise threshold for quantum advantage as the error rate at which noisy Grover is no faster than classical random sampling; our threshold $p_2^*$ follows the same idea, but counts verified oracle calls against brute force on structural CSP oracles rather than on a hard-coded marked state. Stoudenmire and Waintal~\cite{stoudenmire2024} show that per-iteration noise of order $10^{-4}$ already destroys large Grover runs. They also argue that a classical simulation of a SAT oracle is far slower than classical SAT solvers; this interpretation has been debated, but their noise estimates are not in dispute. Satoh et al.~\cite{satoh2020} shrink NISQ search circuits with a subdivided phase oracle. On the hardware side, AbuGhanem~\cite{abughanem2025} characterises textbook Grover search on large IBM superconducting processors, and Pokharel and Lidar~\cite{pokharel2024} obtain better-than-classical success on small hard-coded instances by combining quantum error detection with dynamical decoupling. Their result relies on error \emph{detection} with post-selection, not extrapolation, which is consistent with our finding that zero-noise extrapolation alone does not restore search (Section~\ref{sec:zne}).
+
+\textbf{Classical baselines at scale.} Brehm and Weggemans~\cite{brehm2026} compare fault-tolerant Grover and quantum backtracking with a SAT-competition winner and find that almost all asymptotic speedups vanish once instances have minimal structure. Our small-instance observation that noisy Grover at $p_2=10^{-3}$ is no cheaper than WalkSAT, and on unique-solution formulas costlier than DPLL, is a NISQ-scale counterpart of that result.
+
+\textbf{Circuit and mitigation techniques.} Relative-phase Toffolis~\cite{maslov2016} and conditionally clean ancillae~\cite{khattar2025} reduce multi-controlled-gate cost. Zero-noise extrapolation~\cite{temme2017,giurgica2020} estimates noiseless expectation values from deliberately amplified noise.
+
+%==============================================================================
+\section{Background}
+
+Let $N=2^n$ assignments contain $M\ge1$ solutions and define $\sin\theta=\sqrt{M/N}$. After $k$ Grover iterations on the uniform superposition, a measurement returns a solution with probability~\cite{bbht1998,nielsen2010}
+\begin{equation}
+P_\text{ideal}(k) = \sin^2\!\big((2k+1)\theta\big),
+\end{equation}
+which is close to one for $k=\lfloor\pi/4\theta\rfloor \approx (\pi/4)\sqrt{N/M}$. Since a candidate is cheap to check classically, Grover is run, its output verified, and the procedure repeated until a solution is found. When $M$ is unknown, the BBHT algorithm~\cite{bbht1998} draws $k$ uniformly from a range that grows by a factor $\lambda=6/5$ after each failure and still uses $O(\sqrt{N/M})$ oracle calls.
+
+%==============================================================================
+\section{Methods}
+
+\subsection{Problem encodings}
+A CSP has $n$ Boolean variables and a list of constraints. Each constraint is computed into its own ancilla qubit, using three primitives:
+\begin{itemize}
+\item \texttt{Clause} (an OR of literals), used for SAT.
+\item \texttt{NotEqual}$(a,b)$ for registers of equal width, used for colouring edges and Sudoku peers. For one bit it costs two CNOTs; wider registers use bitwise XOR followed by an OR.
+\item \texttt{InSet}$(r,S)$, used for Sudoku givens and for excluding the fourth code in 3-colouring.
+\end{itemize}
+A $k$-colouring uses $\lceil\log_2 k\rceil$ qubits per vertex; a $4\times4$ Sudoku uses two qubits per blank cell. The oracle computes all constraint ancillas, applies a multi-controlled X from the ancillas onto an output qubit prepared in $|-\rangle$, and then uncomputes. The register therefore holds $n+m+1$ qubits, where $m$ is the number of constraints. The diffuser is the standard inversion about the mean on the $n$ variable qubits. Every oracle, in every synthesis variant, was verified exhaustively: on each basis input it applies the correct phase and returns every ancilla to $|0\rangle$.
+
+\subsection{Oracle synthesis variants}
+\textbf{Baseline.} Qiskit's default ancilla-free multi-controlled X decomposition.
+
+\textbf{Ancilla-aware + relative-phase (aux+rp).} This variant makes three changes:
+\begin{enumerate}
+\item \emph{Compute blocks:} 2- and 3-control gates become relative-phase Toffolis (\texttt{rccx}, 3 CNOTs; \texttt{rcccx}, 6 CNOTs).
+\item \emph{Final multi-controlled gate:} it borrows a variable qubit as a dirty ancilla~\cite{khattar2025}.
+\item \emph{Diffuser:} it runs at a point where every constraint ancilla is clean, so it uses them for a v-chain or a one-clean-ancilla construction~\cite{khattar2025}.
+\end{enumerate}
+The relative-phase substitution is exact for this oracle. A product of classical reversible gates and diagonal phases has the form $DP$, with $P$ a permutation and $D$ diagonal on the variable and ancilla qubits. The phase kick, controlled on the ancillas, commutes with $D$, so $D$ cancels against $D^\dagger$ in the uncompute step. The exhaustive check above confirms this.
+
+\subsection{Noise models}
+\textbf{Parametric model.} Circuits are transpiled to $\{r_z, \sqrt{X}, X, \mathrm{CX}\}$ with all-to-all connectivity at optimisation level~1. We apply depolarizing noise $p_2$ to CX gates and $p_2/10$ to $\sqrt{X}$ and $X$; $r_z$ is virtual and error-free.
+
+\textbf{Device models.} Circuits are routed with Qiskit~\cite{qiskit2024} at optimisation level~3 onto the snapshots of IBM \emph{Brisbane} (Eagle, ECR), \emph{Torino} (Heron r1, CZ) and \emph{Kingston} (Heron r2, CZ) shipped with \texttt{qiskit-ibm-runtime}. Each gate on each qubit gets two error terms: depolarizing error at its calibrated rate, and $T_1/T_2$ relaxation over its duration. Each qubit also gets its calibrated readout error. Only the physical qubits a circuit touches are simulated.
+
+All simulations use Qiskit~2.2.3 and Qiskit Aer~0.17.2.
+
+\subsection{Cost model and threshold}
+Classical costs are counted as assignment checks:
+\begin{itemize}
+\item random-order brute force: expected cost $Q_\text{C}=(N+1)/(M+1)$;
+\item DPLL~\cite{dll1962} with unit propagation, pure literals and most-frequent-variable branching: search nodes, i.e.\ decisions plus propagations;
+\item WalkSAT~\cite{selman1994} with noise $0.5$: assignments visited, averaged over 100 restarts.
+\end{itemize}
+Grover with $k=\lfloor\pi/4\theta\rfloor$ iterations is repeated until a measured assignment passes the classical check. Its expected cost is therefore
+\begin{equation}
+Q_\text{G} = \frac{k+1}{P_\text{succ}}.
+\label{eq:qg}
+\end{equation}
+BBHT is evaluated by Monte Carlo (20{,}000 trials), counting $k$ oracle calls plus one check per round.
+
+The \emph{advantage threshold} $p_2^*$ is the largest $p_2$ with $Q_\text{G} < Q_\text{C}$. It is found by log--log interpolation on the grid $p_2\in\{10^{-4},3{\times}10^{-4},10^{-3},2{\times}10^{-3},5{\times}10^{-3},10^{-2}\}$, with $p_2=0$ taken from the exact ideal success. Each cell uses 1024 shots. 95\% confidence intervals come from a parametric bootstrap over shot noise (300 resamples).
+
+\subsection{Instances}
+\begin{itemize}
+\item \emph{2-colouring:} random labelled trees with $n\in\{4,5,6\}$ vertices, so $M=2$.
+\item \emph{3-SAT:} random formulas with a unique solution, $n\in\{3,4\}$, using the fewest clauses that achieve it.
+\item \emph{$4\times4$ Sudoku:} random puzzles with a unique solution and 2, 3 or 4 blanks.
+\end{itemize}
+There are four random instances per size, all with at most 13 qubits. For the multiple-solution study we generate random 3-SAT formulas with exactly $M\in\{1,2,4,8\}$ solutions for $n\in\{4,5\}$, three per $(n,M)$, and simulate the baseline oracle at $p_2=10^{-3}$ with 512 shots.
+
+%==============================================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{Noise-threshold map}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.95\textwidth]{study_heatmap_aux_rp.png}
+\caption{Mean probability that the measured assignment is a solution, per instance size, for the aux+rp oracle. Outlined cells are those where Grover's expected cost (\ref{eq:qg}) is still below classical brute force.}
+\label{fig:heatmap}
+\end{figure*}
+
+\input{generated/tab_threshold}
+
+Fig.~\ref{fig:heatmap} shows the success probability across noise levels and Table~\ref{tab:threshold} the resulting thresholds. Three patterns stand out. First, deeper oracles break first: within each family the threshold falls as the CX count grows. Second, the threshold is \emph{not} a function of circuit size alone. The 3-SAT oracles with 312 CX have a threshold four times lower than 2-colouring trees with 344 CX. Third, instances of the same size have nearly identical thresholds: the bootstrap intervals are narrow, and the spread between random instances is small compared with the differences between sizes.
+
+The second pattern has a simple cause. By~(\ref{eq:qg}), Grover beats brute force only while
+\begin{equation}
+P_\text{succ} > P_\text{req} = \frac{(k+1)(M+1)}{N+1}.
+\end{equation}
+For 3-SAT with $n=3$ ($N=8$, $M=1$, $k=2$), $P_\text{req}=0.67$: Grover can lose only a third of its success probability before the 4.5 expected checks of brute force win. For a 6-vertex tree ($N=64$, $M=2$, $k=4$), $P_\text{req}=0.23$. The small search spaces in which our deepest oracles live are exactly the ones where Grover has the least room for error.
+
+\subsection{A one-parameter threshold model}
+\label{sec:model}
+
+Suppose noise shrinks the success probability as $P_\text{succ}\approx P_\text{ideal}\,e^{-\alpha p_2 N_\text{CX}}$, where $N_\text{CX}$ is the number of two-qubit gates and $\alpha$ absorbs the single-qubit errors and the fraction of errors that are harmless. Setting $P_\text{succ}=P_\text{req}$ gives
+\begin{equation}
+p_2^* = \frac{\ln\!\left(P_\text{ideal}/P_\text{req}\right)}{\alpha\,N_\text{CX}}.
+\label{eq:model}
+\end{equation}
+We fit the single constant $\alpha$ (geometric mean over instances) on the 2-colouring and 3-SAT instances and keep the Sudoku instances as a held-out test. The fit gives $\alpha=\alphaFit$; per-instance values lie in $[\alphaMin,\alphaMax]$. Over all \nModel{} instance--oracle pairs with a threshold inside the grid, (\ref{eq:model}) predicts the measured $p_2^*$ to within a factor of \ratioMin--\ratioMax{} with $R^2=\modelRsq$ on $\log p_2^*$ (Fig.~\ref{fig:model}). On the \nHeld{} held-out Sudoku pairs the prediction stays within \heldRatioMin--\heldRatioMax{} ($R^2=\heldRsq$). \todo{Confirm the held-out sentence once the Sudoku runs finish; rephrase if the fit degrades.} For comparison, a two-parameter power law $p_2^*\propto N_\text{CX}^{-b}$ fitted per oracle variant reaches only $R^2=\powBaseRsq$ (baseline, $b=\powBase$, 95\% CI $[\powBaseLo,\powBaseHi]$) and $R^2=\powAuxRsq$ (aux+rp), because it ignores the $P_\text{req}$ margin.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{study_decay_model.png}
+\caption{Measured advantage threshold against the prediction of (\ref{eq:model}). Filled markers were used to fit $\alpha$; open markers are held out.}
+\label{fig:model}
+\end{figure}
+
+Equation~(\ref{eq:model}) also shows how the threshold scales. For $M\ll N$, $P_\text{req}\approx(\pi/4)(M+1)/\sqrt{NM}$, so the numerator grows only as $\tfrac12\ln(N/M)$, while $N_\text{CX}\approx(\pi/4)\sqrt{N/M}\,C_\text{it}$ grows with the square root of the search space times the cost $C_\text{it}$ of one iteration. For a 20-variable 3-SAT instance with a unique solution ($N=2^{20}$), around 85 clauses at the satisfiability threshold already need about $10^3$ CX per iteration in the aux+rp construction (6 CX to compute and 6 to uncompute each clause). With $C_\text{it}=10^3$ and $\alpha=\alphaFit$, (\ref{eq:model}) gives $p_2^*\approx\num{1e-5}$, two orders of magnitude below the best current two-qubit gates. This extrapolation assumes $\alpha$ stays constant and ignores routing, so it is optimistic.
+
+\subsection{Oracle synthesis}
+
+The aux+rp oracle reduces the CX count to between \cxRatioMin{} and \cxRatioMax{} of the baseline (median \cxRatioMed). The saving is largest for 3-SAT, whose 3-literal clauses map onto \texttt{rcccx} gates: the 13-qubit instances drop from 932 to 558 CX. There the threshold rises by a median factor of \gainSatMed{} (Table~\ref{tab:threshold}), in line with (\ref{eq:model}), which predicts a gain equal to the inverse CX ratio. For 2-colouring, whose constraints are already two-CNOT parity checks, the saving is only 2--12\,\% and so is the gain. Better synthesis therefore buys a constant factor, not a change in scaling.
+
+\subsection{Calibrated device models}
+
+\input{generated/tab_device}
+
+Routing onto heavy-hex layouts multiplies the two-qubit gate count by a median factor of \routeOverhead{} (Table~\ref{tab:device}). Grover's expected cost beats brute force in \deviceAdvantage{} of \deviceRuns{} device runs. \todo{Describe which instances and devices keep an advantage, and compare Heron r2 with Eagle, once the device runs finish.}
+
+\subsection{Multiple solutions and unknown $M$}
+
+\input{generated/tab_multi}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{csp_queries_vs_solutions_n4.png}
+\caption{Expected cost to a verified solution against the number of solutions $M$ for random 3-SAT with $n=4$. Dashed lines are classical solvers whose work unit differs from an oracle call.}
+\label{fig:multi}
+\end{figure}
+
+Table~\ref{tab:multi} and Fig.~\ref{fig:multi} compare all methods as $M$ grows. More solutions mean fewer iterations, so the circuit is shallower and noise does less damage: for $n=4$ at $p_2=10^{-3}$, the success probability falls from \succMOneIdeal{} to \succMOneNoisy{} for $M=1$, but only from \succMFourIdeal{} to \succMFourNoisy{} for $M=4$. Not knowing $M$ costs a factor of \bbhtRatioMin--\bbhtRatioMax{}: BBHT still beats brute force whenever $M\le N/4$. At $M=N/2$ the optimal $k$ is zero and Grover reduces to random sampling, so its edge is gone.
+
+Noiseless Grover needs the fewest oracle calls in every row with $M\le N/4$. With noise, the picture changes. At $p_2=10^{-3}$, noisy Grover is within 20\,\% of WalkSAT in every simulated row, and for the unique-solution formula with $n=4$ it needs 8.2 calls against 4.7 DPLL nodes. A DPLL node is cheaper than an oracle call on any hardware, so the comparison is qualitative, but it shows that a quadratic speedup over brute force is not a speedup over practical classical solvers at this scale.
+
+\subsection{Zero-noise extrapolation}
+\label{sec:zne}
+
+\input{generated/tab_zne}
+
+We apply global unitary folding $U\mapsto U(U^\dagger U)^j$ with scale factors $\lambda\in\{1,3,5\}$ and Richardson extrapolation to $\lambda=0$, using 2048 shots per circuit. Table~\ref{tab:zne} shows that the extrapolated $P_\text{succ}$ is close to the ideal value (median absolute error \zneRichErr{} against \zneRawErr{} unmitigated). ZNE nevertheless cannot rescue search. It corrects an \emph{expectation value}, here the estimated $P_\text{succ}$, but every individual shot is still drawn from the noisy distribution, and the folded circuits that produce the correction succeed even less often. The cost~(\ref{eq:qg}) to obtain an actual verified solution therefore only grows. ZNE is useful for characterising a device on a search circuit, not for finding answers. Approaches that change the sampled distribution, such as error detection with post-selection~\cite{pokharel2024}, are needed instead.
+
+%==============================================================================
+\section{Discussion}
+
+The results tell a consistent story. Grover's advantage over brute force on these CSPs is lost at roughly one expected two-qubit error per circuit, scaled by the logarithm of how much success probability Grover can spare, and~(\ref{eq:model}) captures this with a single constant. Measured thresholds lie between \thrLowest{} and above \num{1e-2}, comparable to the two-qubit error rates of current superconducting processors, and that is before routing is accounted for. Oracle synthesis raises the threshold by up to the inverse of its CX saving, which is valuable but leaves the $\sqrt{N}$ growth of circuit depth untouched. Because the numerator of~(\ref{eq:model}) grows only logarithmically, problems large enough to matter push the threshold toward $10^{-5}$ and below, which points to error-corrected rather than NISQ hardware.
+
+%==============================================================================
+\section{Limitations}
+\begin{itemize}
+\item Instances are small ($N\le 256$, at most 13 logical qubits), limited by noisy simulation cost.
+\item The parametric study assumes all-to-all connectivity; routing is included only in the device study.
+\item Scaling conclusions rest on the fitted model, not on large instances, and assume $\alpha$ stays constant.
+\item Device models are calibration snapshots without crosstalk, leakage or drift.
+\item Iteration counts use $M$ from classical enumeration; BBHT removes that assumption at a constant-factor cost.
+\item DPLL and WalkSAT costs are measured in their own work units and are compared only qualitatively.
+\end{itemize}
+
+%==============================================================================
+\section{Conclusion}
+We simulated Grover search with constraint-evaluating oracles on 3-SAT, graph colouring and Sudoku, and compared it with classical solvers under realistic noise. The advantage over brute force vanishes at two-qubit error rates between \thrLowest{} and above \num{1e-2}, and a one-parameter model, $p_2^*=\ln(P_\text{ideal}/P_\text{req})/(\alpha N_\text{CX})$, predicts these thresholds closely. Relative-phase and ancilla-aware synthesis raises the threshold by a constant factor, BBHT handles an unknown number of solutions at modest cost, and zero-noise extrapolation does not help search. Practical Grover search on CSPs will need error rates far below today's, or error correction.
+
+%==============================================================================
+\section*{Code and data availability}
+All source code, raw CSV data, figure scripts and the interactive app are at \url{https://github.com/scintillating2107/Simulation-of-Quantum-search-using-grover-s-algorithm-and-comparative-study-}. \texttt{study.py} reproduces every number in this paper; \texttt{hardware.py} reruns the circuits on IBM Quantum hardware.
+
+\section*{Acknowledgment}
+The author thanks \todo{professor's name} for supervision and guidance throughout this work. Parts of the simulation code and text were drafted with the assistance of an AI coding assistant; the author verified all code, results and claims.
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\end{document}

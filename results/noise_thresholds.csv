@@ -1,0 +1,10 @@
+family,problem,cx,qubits,threshold,status
+2-colouring (path graphs),2-colouring P3,20,6,0.03,above_grid
+2-colouring (path graphs),2-colouring P4,80,8,0.010323210075351863,ok
+2-colouring (path graphs),2-colouring P5,204,10,0.005979499566756077,ok
+3-SAT (unique solution),3-SAT n=3 m=7,522,11,0.0007380784434604919,ok
+4x4 Sudoku (unique solution),4x4 Sudoku (2 blanks),204,8,0.004225523200381113,ok
+2-colouring (path graphs),2-colouring P6,352,12,0.004829450009772157,ok
+3-SAT (unique solution),3-SAT n=4 m=8,932,13,0.0008469779861206356,ok
+4x4 Sudoku (unique solution),4x4 Sudoku (3 blanks),672,11,0.003010629910431078,ok
+4x4 Sudoku (unique solution),4x4 Sudoku (4 blanks),1488,13,0.0018050706766753212,ok

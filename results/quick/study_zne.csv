@@ -1,0 +1,10 @@
+family,size,seed,problem,synthesis,n_vars,constraints,qubits,cx,depth,N,M,iterations,ideal,classical,noise,factor,shots,hits
+2-colouring (random trees),n=4,0,tree n=4 #0,aux+rp,4,3,8,76,126,16,2,2,0.9453124999999999,5.666666666666667,depolarizing p2=0.001,1,4096,3678
+2-colouring (random trees),n=4,0,tree n=4 #0,aux+rp,4,3,8,76,126,16,2,2,0.9453124999999999,5.666666666666667,depolarizing p2=0.001,3,4096,3360
+2-colouring (random trees),n=4,0,tree n=4 #0,aux+rp,4,3,8,76,126,16,2,2,0.9453124999999999,5.666666666666667,depolarizing p2=0.001,5,4096,3042
+3-SAT (unique solution),n=3,0,3-SAT n=3 m=7 #0,aux+rp,3,7,11,312,743,8,1,2,0.9453124999999999,4.5,depolarizing p2=0.001,1,4096,3070
+3-SAT (unique solution),n=3,0,3-SAT n=3 m=7 #0,aux+rp,3,7,11,312,743,8,1,2,0.9453124999999999,4.5,depolarizing p2=0.001,3,4096,2058
+3-SAT (unique solution),n=3,0,3-SAT n=3 m=7 #0,aux+rp,3,7,11,312,743,8,1,2,0.9453124999999999,4.5,depolarizing p2=0.001,5,4096,1486
+4x4 Sudoku (unique solution),2 blanks,0,Sudoku 2 blanks #0,aux+rp,4,2,7,90,168,16,1,3,0.9613189697265625,8.5,depolarizing p2=0.001,1,4096,3711
+4x4 Sudoku (unique solution),2 blanks,0,Sudoku 2 blanks #0,aux+rp,4,2,7,90,168,16,1,3,0.9613189697265625,8.5,depolarizing p2=0.001,3,4096,3243
+4x4 Sudoku (unique solution),2 blanks,0,Sudoku 2 blanks #0,aux+rp,4,2,7,90,168,16,1,3,0.9613189697265625,8.5,depolarizing p2=0.001,5,4096,2876

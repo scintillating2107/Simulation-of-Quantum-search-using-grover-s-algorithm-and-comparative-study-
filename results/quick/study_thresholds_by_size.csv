@@ -1,0 +1,7 @@
+family,size,synthesis,cx,qubits,n,thr_median,thr_min,thr_max
+2-colouring (random trees),n=4,aux+rp,76.0,8,1,0.005,0.005,0.005
+2-colouring (random trees),n=4,baseline,80.0,8,1,0.005,0.005,0.005
+3-SAT (unique solution),n=3,aux+rp,312.0,11,1,0.0012452519118942192,0.0012452519118942192,0.0012452519118942192
+3-SAT (unique solution),n=3,baseline,522.0,11,1,0.0008440209031434753,0.0008440209031434753,0.0008440209031434753
+4x4 Sudoku (unique solution),2 blanks,aux+rp,90.0,7,1,0.005,0.005,0.005
+4x4 Sudoku (unique solution),2 blanks,baseline,132.0,7,1,0.005,0.005,0.005

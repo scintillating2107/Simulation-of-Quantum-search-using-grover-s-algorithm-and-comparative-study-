@@ -3,4 +3,5 @@ matplotlib>=3.4.0
 qiskit[visualization]>=1.0.0
 qiskit-aer>=0.13.0
 pylatexenc>=2.10
-streamlit>=1.28.0
+streamlit>=1.50.0
+qiskit-ibm-runtime>=0.30

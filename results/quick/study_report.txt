@@ -1,0 +1,34 @@
+## Threshold study
+                      family     size synthesis    cx  qubits  n  thr_median  thr_min  thr_max
+  2-colouring (random trees)      n=4    aux+rp  76.0       8  1     0.00500  0.00500  0.00500
+  2-colouring (random trees)      n=4  baseline  80.0       8  1     0.00500  0.00500  0.00500
+     3-SAT (unique solution)      n=3    aux+rp 312.0      11  1     0.00125  0.00125  0.00125
+     3-SAT (unique solution)      n=3  baseline 522.0      11  1     0.00084  0.00084  0.00084
+4x4 Sudoku (unique solution) 2 blanks    aux+rp  90.0       7  1     0.00500  0.00500  0.00500
+4x4 Sudoku (unique solution) 2 blanks  baseline 132.0       7  1     0.00500  0.00500  0.00500
+
+## Power law  p* = A * CX^-b
+Empty DataFrame
+Columns: []
+Index: []
+
+aux+rp vs baseline: CX ratio median 0.68 [0.60, 0.95], threshold gain median 1.00x [1.00, 1.48] over 3 instances
+
+## Device study
+    device synthesis  instances  routing_overhead  success_median  advantage
+FakeTorino    aux+rp          3             2.118           0.517          1
+FakeTorino  baseline          3             2.075           0.412          0
+
+    device            problem synthesis  cx_all_to_all   cx  ideal  success  random_guess  advantage
+FakeTorino        tree n=4 #0  baseline             80  166  0.945    0.528         0.125      False
+FakeTorino        tree n=4 #0    aux+rp             76  161  0.945    0.528         0.125      False
+FakeTorino   3-SAT n=3 m=7 #0  baseline            522 1470  0.945    0.124         0.125      False
+FakeTorino   3-SAT n=3 m=7 #0    aux+rp            312  961  0.945    0.128         0.125      False
+FakeTorino Sudoku 2 blanks #0  baseline            132  245  0.961    0.412         0.062      False
+FakeTorino Sudoku 2 blanks #0    aux+rp             90  153  0.961    0.517         0.062       True
+
+## Zero-noise extrapolation (estimate of P(success))
+           problem                 noise  ideal   raw  linear  richardson  classical  iterations  raw_error  richardson_error
+       tree n=4 #0 depolarizing p2=0.001  0.945 0.898   0.937       0.937      5.667           2      0.047             0.009
+  3-SAT n=3 m=7 #0 depolarizing p2=0.001  0.945 0.750   0.873       0.913      4.500           2      0.196             0.032
+Sudoku 2 blanks #0 depolarizing p2=0.001  0.961 0.906   0.963       0.972      8.500           3      0.055             0.011
